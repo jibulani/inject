@@ -3,9 +3,11 @@ package ru.qiwi.academy.inject;
 import org.reflections.Reflections;
 
 import javax.inject.Named;
+import javax.xml.stream.events.Namespace;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -20,54 +22,178 @@ public class ContainerImpl implements Container {
 
     Reflections reflections;
 
-    Set<Class<? extends Object>> allClasses;
+    HashMap<Class, Object> singletons;
 
     Object singletonObj;
 
     ContainerImpl(String packageName) {
         reflections = new Reflections(packageName);
+        singletons = new HashMap<>();
+        Set<Class<?>> eagers= reflections.getTypesAnnotatedWith(ru.qiwi.academy.inject.Eager.class);
+        for (Class<?> eager : eagers) {
+            try {
+                singletons.put(eager, eager.newInstance());
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public Map<Class, Object> getAllSingletonObj() {
-        HashMap<Class, Object> allSingletonObjs = new HashMap<>();
-        ContainerImpl c = new ContainerImpl("ru.qiwi.academy");
-        allSingletonObjs.put(c.getClass(), c);
-        return allSingletonObjs;
+        return singletons;
     }
 
     public <T> T getInstance(Class<T> clazz) {
         try {
-            Annotation[] annotations = clazz.getAnnotations();
-            for (Annotation a : annotations) {
-                if (a.annotationType().getSimpleName().equals("Singleton")) {
-                    if (singletonObj == null) {
-                        singletonObj = clazz.newInstance();
-                    }
-                    return (T) singletonObj;
-                }
-            }
             Constructor[] constructors = clazz.getConstructors();
 
             if (constructors.length > 1) {
                 throw new IllegalArgumentException();
             }
-            for (Constructor constructor : constructors) {
+            else if (constructors.length == 0) {
+                Annotation[] annotations = clazz.getAnnotations();
+                for (Annotation a : annotations) {
+                    if (a.annotationType().getSimpleName().equals("Singleton")) {
+                        if (singletons != null) {
+                            if (singletons.get(clazz) == null) {
+                                T currSingleton = clazz.newInstance();
+                                singletons.put(clazz, currSingleton);
+                                return currSingleton;
+                            }
+                            return (T) singletons.get(clazz);
+                        }
+                        else {
+                            T currSingleton = clazz.newInstance();
+                            singletons.put(clazz, currSingleton);
+                            return currSingleton;
+                        }
+                    }
+                }
+                return clazz.newInstance();
+            }
+            else if (constructors.length == 1) {
+                Annotation[] annotations = clazz.getAnnotations();
+                for (Annotation a : annotations) {
+                    if (a.annotationType().getSimpleName().equals("Singleton")) {
+                        if (singletons != null) {
+                            if (singletons.get(clazz) == null) {
+                                ArrayList<Object> objects = new ArrayList<>();
+
+                                Class[] paramClasses = constructors[0].getParameterTypes();
+
+
+                                Annotation[][] annotations2 = constructors[0].getParameterAnnotations();
+                                int i = 0;
+                                for (Class paramClass : paramClasses) {
+
+                                    if (paramClass.isInterface() && annotations2[0].length == 0) {
+                                        throw new IllegalStateException();
+                                    }
+
+
+
+                                    Object obj;// = new Object();
+                                    if (annotations2[0].length != 0) {
+                                        Named a2 = (Named) annotations2[i][0];
+                                        obj = this.getInstance(a2.value(), paramClass);
+
+                                    }
+                                    else {
+                                        obj = this.getInstance(paramClass);
+                                    }
+                                    objects.add(obj);
+                                    i++;
+
+//                                    Constructor paramClassConstr = paramClass.getConstructors()[0];
+//                                    Class[] paramClasses2 = paramClassConstr.getParameterTypes();
+//                                    System.out.println("got param types of constr of param type");
+//                                    for (Class paramClass2 : paramClasses2) {
+//                                        System.out.println(clazz.toString());
+//                                        System.out.println(paramClass2.toString());
+//                                        if (clazz.toString().equals(paramClass2.toString())) {
+//                                            return null;
+//                                        }
+//                                    }
+                                }
+                                Object[] objects1 = objects.toArray();
+                                T newSingleton = (T) constructors[0].newInstance(objects1);
+                                singletons.put(clazz, newSingleton);
+                                return newSingleton;
+                            }
+                            return (T) singletons.get(clazz);
+                        }
+
+                        else {
+
+                            ArrayList<Object> objects = new ArrayList<>();
+
+                            Class[] paramClasses = constructors[0].getParameterTypes();
+
+
+                            Annotation[][] annotations2 = constructors[0].getParameterAnnotations();
+                            int i = 0;
+                            for (Class paramClass : paramClasses) {
+
+                                if (paramClass.isInterface() && annotations2[0].length == 0) {
+                                    throw new IllegalStateException();
+                                }
+                                Object obj; // = new Object();
+                                if (annotations2[0].length != 0) {
+                                    Named a2 = (Named) annotations2[i][0];
+                                    obj = this.getInstance(a2.value(), paramClass);
+
+                                }
+                                else {
+                                    obj = this.getInstance(paramClass);
+                                }
+                                objects.add(obj);
+                                i++;
+                            }
+                            Object[] objects1 = objects.toArray();
+                            T newSingleton = (T) constructors[0].newInstance(objects1);
+                            singletons.put(clazz, newSingleton);
+                            return newSingleton;
+
+
+
+
+//                            ArrayList<Object> objects = new ArrayList<>();
+//                            Class[] paramClasses = constructors[0].getParameterTypes();
+//                            for (Class paramClass : paramClasses) {
+//                                Object obj = this.getInstance(paramClass);
+//                                objects.add(obj);
+//                            }
+//                            Object[] objects1 = objects.toArray();
+//                            T newSingleton = (T) constructors[0].newInstance(objects1);
+//                            singletons.put(clazz, newSingleton);
+//                            return newSingleton;
+                        }
+                    }
+                }
                 ArrayList<Object> objects = new ArrayList<>();
-                Class[] paramClasses = constructor.getParameterTypes();
+                Class[] paramClasses = constructors[0].getParameterTypes();
                 for (Class paramClass : paramClasses) {
-                    Object obj = getInstance(paramClass);
+                    Object obj = this.getInstance(paramClass.getName());
                     objects.add(obj);
                 }
                 Object[] objects1 = objects.toArray();
-                Object obj = constructor.newInstance(objects1);
+                Object obj = constructors[0].newInstance(objects1);
                 return (T) obj;
             }
             Object obj = clazz.newInstance();
             return (T) obj;
         }
+        catch (IllegalArgumentException e) {
+            e.printStackTrace();
+            throw e;
+        }
+        catch (IllegalStateException e) {
+            throw e;
+        }
         catch (Exception e) {
             e.printStackTrace();
-            throw new IllegalArgumentException();
+            return null;
         }
     }
 
@@ -96,9 +222,83 @@ public class ContainerImpl implements Container {
     }
     public Object getInstance(String name) {
         try {
+            Class clazz = Class.forName(name);
+            Constructor[] constructors = clazz.getConstructors();
+
+            if (constructors.length > 1) {
+                throw new IllegalArgumentException();
+            }
+            else if (constructors.length == 0) {
+                Annotation[] annotations = clazz.getAnnotations();
+                for (Annotation a : annotations) {
+                    if (a.annotationType().getSimpleName().equals("Singleton")) {
+                        if (singletons != null) {
+                            if (singletons.get(clazz) == null) {
+                                Object currSingleton = clazz.newInstance();
+                                singletons.put(clazz, currSingleton);
+                                return currSingleton;
+                            }
+                            return singletons.get(clazz);
+                        }
+                        else {
+                            Object currSingleton = clazz.newInstance();
+                            singletons.put(clazz, currSingleton);
+                            return currSingleton;
+                        }
+                    }
+                }
+                return clazz.newInstance();
+            }
+            else if (constructors.length == 1) {
+                Annotation[] annotations = clazz.getAnnotations();
+                for (Annotation a : annotations) {
+                    if (a.annotationType().getSimpleName().equals("Singleton")) {
+                        if (singletons != null) {
+                            if (singletons.get(clazz) == null) {
+                                ArrayList<Object> objects = new ArrayList<>();
+                                Class[] paramClasses = constructors[0].getParameterTypes();
+                                for (Class paramClass : paramClasses) {
+                                    Object obj = this.getInstance(paramClass);
+                                    objects.add(obj);
+                                }
+                                Object[] objects1 = objects.toArray();
+                                Object newSingleton = constructors[0].newInstance(objects1);
+                                singletons.put(clazz, newSingleton);
+                                return newSingleton;
+                            }
+                            return singletons.get(clazz);
+                        }
+                        else {
+                            ArrayList<Object> objects = new ArrayList<>();
+                            Class[] paramClasses = constructors[0].getParameterTypes();
+                            for (Class paramClass : paramClasses) {
+                                Object obj = this.getInstance(paramClass);
+                                objects.add(obj);
+                            }
+                            Object[] objects1 = objects.toArray();
+                            Object newSingleton = constructors[0].newInstance(objects1);
+                            singletons.put(clazz, newSingleton);
+                            return newSingleton;
+                        }
+                    }
+                }
+                ArrayList<Object> objects = new ArrayList<>();
+                Class[] paramClasses = constructors[0].getParameterTypes();
+                for (Class paramClass : paramClasses) {
+                    Object obj = this.getInstance(paramClass.getName());
+                    objects.add(obj);
+                }
+                Object[] objects1 = objects.toArray();
+                Object obj = constructors[0].newInstance(objects1);
+                return obj;
+            }
+
             Class c = Class.forName(name);
             Object obj = c.newInstance();
             return obj;
+        }
+        catch (IllegalArgumentException e) {
+            throw e;
         }
         catch (Exception e) {
             e.printStackTrace();
