@@ -82,6 +82,23 @@ public class ContainerImpl implements Container {
 
                                 Class[] paramClasses = constructors[0].getParameterTypes();
 
+                                for (Class paramClass : paramClasses) {
+                                    if (paramClass.getConstructors().length > 0) {
+                                        Constructor paramClassConstr = paramClass.getConstructors()[0];
+                                        Class[] paramClasses2 = paramClassConstr.getParameterTypes();
+                                        System.out.println("got param types of constr of param type");
+                                        for (Class paramClass2 : paramClasses2) {
+                                            System.out.println(clazz.toString());
+                                            System.out.println(paramClass2.toString());
+                                            if (clazz.toString().equals(paramClass2.toString()) && !clazz.isInterface()) {
+                                                System.out.println("In circle");
+                                                throw new IllegalStateException();
+                                            }
+                                        }
+                                    }
+
+                                }
+
 
                                 Annotation[][] annotations2 = constructors[0].getParameterAnnotations();
                                 int i = 0;
@@ -105,6 +122,7 @@ public class ContainerImpl implements Container {
                                     objects.add(obj);
                                     i++;
 
+
 //                                    Constructor paramClassConstr = paramClass.getConstructors()[0];
 //                                    Class[] paramClasses2 = paramClassConstr.getParameterTypes();
 //                                    System.out.println("got param types of constr of param type");
@@ -112,7 +130,9 @@ public class ContainerImpl implements Container {
 //                                        System.out.println(clazz.toString());
 //                                        System.out.println(paramClass2.toString());
 //                                        if (clazz.toString().equals(paramClass2.toString())) {
-//                                            return null;
+//
+//                                            singletons.put(clazz, clazz.newInstance());
+//                                            return clazz.newInstance();
 //                                        }
 //                                    }
                                 }
