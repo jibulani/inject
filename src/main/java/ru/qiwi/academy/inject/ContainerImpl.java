@@ -31,19 +31,17 @@ public class ContainerImpl implements Container {
     }
 
     public boolean isCircle(Class initClass, Class[] currClasses) {
-        final boolean[] isCircle = new boolean[1];
-        isCircle[0] = false;
-        Arrays.stream(currClasses).forEach(currClass -> {
+        return Arrays.stream(currClasses).anyMatch(currClass -> {
             if (initClass.toString().equals(currClass.toString())) {
-                isCircle[0] = true;
+                return true;
             }
             else if (currClass.getConstructors().length > 0) {
-                Arrays.stream(currClass.getConstructors()).forEach(constructor -> {
-                    isCircle[0] = isCircle(initClass, constructor.getParameterTypes());
-                });
+                return  Arrays.stream(currClass.getConstructors()).anyMatch(constructor ->
+                        isCircle(initClass, constructor.getParameterTypes())
+                );
             }
+            return false;
         });
-        return isCircle[0];
     }
 
 
@@ -72,7 +70,7 @@ public class ContainerImpl implements Container {
                         return (T) singletons.get(clazz);
                     }
                 }
-                ArrayList<Object> objects = new ArrayList<>();
+                List<Object> objects = new ArrayList<>();
 
                 Class[] paramClasses = constructors[0].getParameterTypes();
 
@@ -85,31 +83,29 @@ public class ContainerImpl implements Container {
                     if (paramClasses[idx].isInterface() && annotations2[idx].length == 0) {
                         throw new IllegalStateException();
                     }
-                    final Object[] obj = {new Object()};
                     if (annotations2[idx].length != 0) {
                         Arrays.stream(annotations2[idx]).forEach(annotation -> {
-                            if (annotation.annotationType().toString().equals(Named.class.toString())) {
+                            if (annotation.annotationType().equals(Named.class)) {
                                 Named a2 = (Named) annotation;
-                                obj[0] = getInstance(a2.value(), paramClasses[idx]);
+                                objects.add(getInstance(a2.value(), paramClasses[idx]));
                             }
                         });
                     }
                     else {
-                        obj[0] = getInstance(paramClasses[idx]);
+                        objects.add(getInstance(paramClasses[idx]));
                     }
-                    objects.add(obj[0]);
                 });
 
-                Object[] objects1 = objects.toArray();
                 if (isSingletonNecessary) {
-                    return (T) singletons.computeIfAbsent(clazz, Object -> createObject(clazz.getConstructors()[0], objects1));
+                    return (T) singletons.computeIfAbsent(clazz, Object -> createObject(clazz.getConstructors()[0], objects));
                 }
-                return createObject(constructors[0], objects1);
+                return createObject(constructors[0], objects);
             }
             Object obj = getInstance(clazz);
             return (T) obj;
         }
         catch (IllegalArgumentException | IllegalStateException e) {
+            e.printStackTrace();
             throw e;
         }
         catch (Exception e) {
@@ -118,9 +114,9 @@ public class ContainerImpl implements Container {
         }
     }
 
-    public <T> T createObject(Constructor constructor, Object[] args) {
+    public <T> T createObject(Constructor constructor, List<Object> args) {
         try {
-            return (T) constructor.newInstance(args);
+            return (T) constructor.newInstance(args.toArray());
         } catch (Exception e) {
             e.printStackTrace();
         }
