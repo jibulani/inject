@@ -333,4 +333,24 @@ public class ContainerTest {
         }
     }
 
+    @Singleton
+    public static class CircularDependencyC {
+        @Inject
+        public CircularDependencyC(CircularDependencyC b) {
+        }
+    }
+
+    @Test(timeout = 1500) // Bonus level 3
+    public void testCircularDependencyCircuitBreak2() throws Exception {
+        CompletableFuture<CircularDependencyC> cf =
+                CompletableFuture.supplyAsync(() -> container.getInstance(CircularDependencyC.class));
+        cf.handle(
+                (instance, th) -> {
+                    Assert.assertNull("Should be empty", instance);
+                    Assert.assertTrue("Cause of exception is IAE", th.getCause() instanceof IllegalStateException);
+                    return null;
+                }).get(1, TimeUnit.HOURS);
+    }
+
 }
+
