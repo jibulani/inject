@@ -137,7 +137,7 @@ public class ContainerImpl implements Container {
                 Object obj = this.getInstance(class1);
                 return (T) obj;
             }
-            Object obj = requiredType.newInstance();
+            Object obj = getInstance(requiredType);
             return (T) obj;
 
         }
